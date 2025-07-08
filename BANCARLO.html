@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bancarlo App</title>
+<style>
+  body {
+    background-color: #000;
+    color: #2EBC22;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0 15px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    padding: 15px 0;
+  }
+  header .logo {
+    font-size: 28px;
+    margin-right: 10px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+  }
+  #saldo {
+    text-align: center;
+    font-size: 26px;
+    margin-bottom: 15px;
+  }
+  #carruselTarjetas {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    border-radius: 15px;
+    margin-bottom: 25px;
+  }
+  #carruselTarjetas img {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 15px;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+  }
+  #carruselTarjetas img.active {
+    opacity: 1;
+    z-index: 1;
+  }
+  nav {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  nav button {
+    background-color: transparent;
+    border: none;
+    color: #2EBC22;
+    font-size: 18px;
+    margin: 0 15px;
+    padding: 8px 20px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: border-color 0.3s;
+  }
+  nav button.active {
+    border-bottom: 3px solid #2EBC22;
+    font-weight: 700;
+  }
+  section {
+    display: none;
+  }
+  section.active {
+    display: block;
+  }
+  label, select, input, button {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    font-size: 16px;
+  }
+  input, select {
+    padding: 10px;
+    border-radius: 5px;
+    border: none;
+  }
+  button.transferir, button.prestamo, button#entrarAdmin, button#sumarSaldo, button#restarSaldo {
+    background-color: #2EBC22;
+    color: #000;
+    font-weight: 700;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button.transferir:hover, button.prestamo:hover, button#entrarAdmin:hover, button#sumarSaldo:hover, button#restarSaldo:hover {
+    background-color: #239c1c;
+  }
+  .mensaje {
+    font-weight: 700;
+    margin-top: 10px;
+  }
+  .mensaje.error {
+    color: #f44336;
+  }
+  .mensaje.exito {
+    color: #2EBC22;
+  }
+  #adminSection {
+    margin-top: 30px;
+    border-top: 1px solid #2EBC22;
+    padding-top: 20px;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script>
+  emailjs.init("-peBNcFrAHBzKJlSo");
+</script>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏦</div>
+  <h1>Bancarlo</h1>
+</header>
+
+<div id="saldo">Saldo: $633.80</div>
+
+<div id="carruselTarjetas">
+  <img src="https://i.ibb.co/TgYbB4B/card1.png" class="active" alt="Tarjeta 1" />
+  <img src="https://i.ibb.co/JzZPqjd/card2.png" alt="Tarjeta 2" />
+</div>
+
+<nav>
+  <button id="btnTransferencia" class="active" onclick="mostrarSeccion('transferencia')">🔁 Transferencia</button>
+  <button id="btnPrestamo" onclick="mostrarSeccion('prestamo')">💵 Préstamo</button>
+</nav>
+
+<section id="transferencia" class="active">
+  <label for="contacto">Selecciona un contacto:</label>
+  <select id="contacto">
+    <option value="carlo">Carlo Itzae</option>
+    <option value="maria">María del Pilar</option>
+    <option value="luis">Luis Alejandro</option>
+  </select>
+
+  <input type="number" id="cantidadTransferencia" placeholder="Cantidad a transferir" min="0.01" step="0.01" />
+  <button class="transferir" onclick="realizarTransferencia()">Transferir</button>
+  <div id="mensajeTransferencia" class="mensaje"></div>
+</section>
+
+<section id="prestamo">
+  <label for="cantidadPrestamo">Cantidad a solicitar (máx $2000):</label>
+  <input type="number" id="cantidadPrestamo" placeholder="Cantidad a solicitar" min="0" max="2000" step="0.01" />
+  <button class="prestamo" onclick="solicitarPrestamo()">Solicitar préstamo</button>
+  <div id="mensajePrestamo" class="mensaje"></div>
+</section>
+
+<div id="adminSection">
+  <input type="password" id="claveAdmin" placeholder="Contraseña de administrador" />
+  <button id="entrarAdmin" onclick="verificarAdmin()">Entrar</button>
+
+  <div id="adminControls" style="display:none; margin-top:15px;">
+    <input type="number" id="modificarCantidad" placeholder="Cantidad" step="0.01" />
+    <button id="sumarSaldo" onclick="sumarSaldo()">➕ Sumar</button>
+    <button id="restarSaldo" onclick="restarSaldo()">➖ Restar</button>
+  </div>
+</div>
+
+<script>
+  const saldoInicial = 633.80;
+  let saldo = parseFloat(localStorage.getItem('saldo')) || saldoInicial;
+
+  const correos = {
+    carlo: { nombre: "Carlo Itzae", email: "carloitzae52@gmail.com" },
+    maria: { nombre: "María del Pilar", email: "mpzamorami@gmail.com" },
+    luis: { nombre: "Luis Alejandro", email: "luisalex58@gmail.com" }
+  };
+
+  const saldoDiv = document.getElementById('saldo');
+  const mensajeTransferencia = document.getElementById('mensajeTransferencia');
+  const mensajePrestamo = document.getElementById('mensajePrestamo');
+
+  function actualizarSaldo() {
+    saldoDiv.textContent = `Saldo: $${saldo.toFixed(2)}`;
+    localStorage.setItem('saldo', saldo.toFixed(2));
+  }
+
+  function mostrarSeccion(seccion) {
+    document.querySelectorAll('section').forEach(sec => sec.classList.remove('active'));
+    document.getElementById(seccion).classList.add('active');
+
+    document.getElementById('btnTransferencia').classList.toggle('active', seccion === 'transferencia');
+    document.getElementById('btnPrestamo').classList.toggle('active', seccion === 'prestamo');
+
+    // Ocultar carrusel si no estamos en inicio (transferencia)
+    document.getElementById('carruselTarjetas').style.display = (seccion === 'transferencia') ? 'block' : 'none';
+  }
+
+  function realizarTransferencia() {
+    mensajeTransferencia.textContent = "";
+    mensajeTransferencia.classList.remove('error', 'exito');
+
+    const contactoKey = document.getElementById('contacto').value;
+    const cantidad = parseFloat(document.getElementById('cantidadTransferencia').value);
+
+    if (isNaN(cantidad) || cantidad <= 0) {
+      mensajeTransferencia.textContent = "Por favor ingresa una cantidad válida.";
+      mensajeTransferencia.classList.add('error');
+      return;
+    }
+    if (cantidad > saldo) {
+      mensajeTransferencia.textContent = "Saldo insuficiente.";
+      mensajeTransferencia.classList.add('error');
+      return;
+    }
+
+    saldo -= cantidad;
+    actualizarSaldo();
+
+    const contacto = correos[contactoKey];
+
+    emailjs.send("service_g8lh31s", "template_l70svmh", {
+      nombre_contacto: contacto.nombre,
+      monto_transferido: cantidad.toFixed(2),
+      to_email: contacto.email
+    })
+    .then(() => {
+      mensajeTransferencia.textContent = `Transferencia enviada a ${contacto.nombre} por $${cantidad.toFixed(2)}.`;
+      mensajeTransferencia.classList.add('exito');
+      document.getElementById('cantidadTransferencia').value = "";
+    }, () => {
+      mensajeTransferencia.textContent = "Error al enviar el correo.";
+      mensajeTransferencia.classList.add('error');
+    });
+  }
+
+  function solicitarPrestamo() {
+    mensajePrestamo.textContent = "";
+    mensajePrestamo.classList.remove('error', 'exito');
+
+    const cantidad = parseFloat(document.getElementById('cantidadPrestamo').value);
+    if (isNaN(cantidad) || cantidad <= 0 || cantidad > 2000) {
+      mensajePrestamo.textContent = "Ingresa una cantidad válida entre 0 y 2000.";
+      mensajePrestamo.classList.add('error');
+      return;
+    }
+
+    emailjs.send("service_g8lh31s", "template_tntd2hp", {
+      nombre_usuario: "Santiago",
+      monto_prestamo: cantidad.toFixed(2),
+      to_email: "carloitzae52@gmail.com"
+    })
+    .then(() => {
+      mensajePrestamo.textContent = `Solicitud de préstamo por $${cantidad.toFixed(2)} enviada.`;
+      mensajePrestamo.classList.add('exito');
+      document.getElementById('cantidadPrestamo').value = "";
+    }, () => {
+      mensajePrestamo.textContent = "Error al enviar la solicitud.";
+      mensajePrestamo.classList.add('error');
+    });
+  }
+
+  function verificarAdmin() {
+    const clave = document.getElementById('claveAdmin').value;
+    if (clave === 'Ban258000') {
+      document.getElementById('adminControls').style.display = 'block';
+      document.getElementById('claveAdmin').style.display = 'none';
+      document.getElementById('entrarAdmin').style.display = 'none';
+    } else {
+      alert('Contraseña incorrecta.');
+    }
+  }
+
+  function sumarSaldo() {
+    const cantidad = parseFloat(document.getElementById('modificarCantidad').value);
+    if (isNaN(cantidad) || cantidad <= 0) {
+      alert('Ingresa una cantidad válida para sumar.');
+      return;
+    }
+    saldo += cantidad;
+    actualizarSaldo();
+    document.getElementById('modificarCantidad').value = '';
+  }
+
+  function restarSaldo() {
+    const cantidad = parseFloat(document.getElementById('modificarCantidad').value);
+    if (isNaN(cantidad) || cantidad <= 0) {
+      alert('Ingresa una cantidad válida para restar.');
+      return;
+    }
+    if (cantidad > saldo) {
+      alert('No puedes restar más de lo que hay.');
+      return;
+    }
+    saldo -= cantidad;
+    actualizarSaldo();
+    document.getElementById('modificarCantidad').value = '';
+  }
+
+  // Inicializar saldo al cargar la página
+  actualizarSaldo();
+
+  // Carrusel tarjetas
+  const tarjetas = document.querySelectorAll('#carruselTarjetas img');
+  let indiceActual = 0;
+  setInterval(() => {
+    tarjetas[indiceActual].classList.remove('active');
+    indiceActual = (indiceActual + 1) % tarjetas.length;
+    tarjetas[indiceActual].classList.add('active');
+  }, 4000);
+
+</script>
+</body>
+</html>
